@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+/* Fallbacks first; the host overrides with its own theme variables (MCP Apps theming). */
+:root{
+  color-scheme: light dark;
+  --color-background-primary: light-dark(#ffffff,#1b2124);
+  --color-background-secondary: light-dark(#f1f5f4,#262e32);
+  --color-text-primary: light-dark(#12262b,#eef4f3);
+  --color-text-secondary: light-dark(#52676b,#a5b6b8);
+  --color-border-primary: light-dark(#d7e2e0,#38444a);
+  --color-text-success: light-dark(#15803d,#4ade80);
+  --color-text-danger: light-dark(#b91c1c,#f87171);
+  --color-background-warning: light-dark(#fef3c7,#3b2f0a);
+  --color-text-warning: light-dark(#92400e,#fcd34d);
+  --font-sans: "Segoe UI", system-ui, sans-serif;
+  --border-radius-md: 10px;
+  --accent: #0f766e;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:14px;background:var(--color-background-primary);color:var(--color-text-primary);font:15px/1.45 var(--font-sans)}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+h1{font-size:1rem;margin:0}
+button{font:inherit;border:1px solid var(--color-border-primary);background:var(--color-background-secondary);color:inherit;border-radius:8px;padding:4px 10px;cursor:pointer}
+button:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpis div{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 10px}
+.kpis b{display:block;font-size:1.35rem}.kpis span{color:var(--color-text-secondary);font-size:.8rem}
+.flag{background:var(--color-background-warning);color:var(--color-text-warning);border-radius:var(--border-radius-md);padding:8px 12px;margin:8px 0;font-size:.9rem}
+.ok{color:var(--color-text-success);font-weight:600;margin:8px 0}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--color-border-primary);font-size:.92rem;gap:8px}
+.tag{font-size:.75rem;font-weight:700}.taken{color:var(--color-text-success)}.missed{color:var(--color-text-danger)}.due{color:var(--color-text-warning)}.upcoming{color:var(--color-text-secondary)}
+svg{width:100%;height:56px;margin-top:6px}
+small{color:var(--color-text-secondary)}
+</style>
+</head>
+<body>
+<header><h1 id="t">Hearth · caregiver view</h1><button id="r" aria-label="Refresh dashboard">Refresh</button></header>
+<div id="app" aria-live="polite"><small>Waiting for data from the host...</small></div>
+<script>
+// Minimal MCP Apps View: JSON-RPC 2.0 over postMessage, no SDK needed (as the spec notes).
+let nid = 1; const pending = new Map();
+const send = (m) => parent.postMessage({ jsonrpc: "2.0", ...m }, "*");
+const request = (method, params) => new Promise((res, rej) => { const id = nid++; pending.set(id, { res, rej }); send({ id, method, params }); });
+const notify = (method, params) => send({ method, params });
+
+function applyCtx(c) {
+  if (!c) return;
+  const v = c.styles && c.styles.variables;
+  if (v) for (const k in v) if (v[k]) document.documentElement.style.setProperty(k, v[k]);
+  if (c.theme) document.documentElement.style.colorScheme = c.theme;
+}
+function render(d) {
+  if (!d || !d.summary) return;
+  const u = d.summary;
+  const pts = (d.moods || []).map((v, i, a) => `${(i / Math.max(a.length - 1, 1)) * 300},${52 - (v - 1) * 11}`).join(" ");
+  document.getElementById("app").innerHTML =
+    `<div class="kpis"><div><b>${u.adherence_percent ?? "-"}%</b><span>7-day adherence</span></div><div><b>${u.mood_average ?? "-"}</b><span>mood (${u.mood_trend})</span></div><div><b>${u.doses_missed}</b><span>missed doses</span></div></div>` +
+    (u.flags.length ? u.flags.map((f) => `<div class="flag">⚠ ${f.text}</div>`).join("") : `<div class="ok">No flags. Routine looks normal.</div>`) +
+    `<svg viewBox="0 0 300 56" role="img" aria-label="Mood over the last check-ins"><polyline fill="none" stroke="var(--accent)" stroke-width="3" points="${pts}"/></svg>` +
+    (d.today || []).map((x) => `<div class="row"><span>${x.time} · ${x.medication} ${x.dose}</span><span class="tag ${x.status}">${x.status}</span></div>`).join("") +
+    `<small>Typical first activity ${u.baseline.typical_first_activity} · alert after ${u.baseline.alert_after} · ${d.now}</small>`;
+}
+window.addEventListener("message", (e) => {
+  const m = e.data; if (!m || m.jsonrpc !== "2.0") return;
+  if (m.id !== undefined && pending.has(m.id) && (m.result !== undefined || m.error)) { const p = pending.get(m.id); pending.delete(m.id); return m.error ? p.rej(new Error(m.error.message)) : p.res(m.result); }
+  if (m.method === "ui/notifications/tool-result") render(m.params && m.params.structuredContent);
+  else if (m.method === "ui/notifications/host-context-changed") applyCtx(m.params);
+  else if (m.method === "ui/resource-teardown" && m.id !== undefined) send({ id: m.id, result: {} });
+});
+document.getElementById("r").onclick = async () => {
+  try { const r = await request("tools/call", { name: "app_refresh", arguments: {} }); render(r.structuredContent); } catch (err) { document.getElementById("app").textContent = "Refresh failed: " + err.message; }
+};
+(async () => {
+  try {
+    const init = await request("ui/initialize", { protocolVersion: "2026-01-26", appCapabilities: { availableDisplayModes: ["inline"] }, clientInfo: { name: "hearth-dashboard", version: "2.0.0" } });
+    applyCtx(init.hostContext);
+    notify("ui/notifications/initialized", {});
+  } catch (err) { document.getElementById("app").textContent = "Host handshake failed: " + err.message; }
+  new ResizeObserver(() => notify("ui/notifications/size-changed", { width: Math.ceil(document.body.getBoundingClientRect().width), height: Math.ceil(document.body.getBoundingClientRect().height) })).observe(document.body);
+})();
+</script>
+</body>
+</html>

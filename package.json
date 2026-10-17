@@ -1,0 +1,21 @@
+{
+  "name": "hearth-alexa-care-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "express": "^4.21.0",
+    "zod": "^3.24.0"
+  },
+  "description": "Hearth: an Alexa+ care companion built on MCP (Streamable HTTP, MCP Apps, elicitation, Agent Skill)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

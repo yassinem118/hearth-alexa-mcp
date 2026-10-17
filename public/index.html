@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hearth v2: Alexa+ care companion (MCP simulator + MCP Apps host)</title>
+<style>
+:root{--bg:#F4F7F6;--card:#fff;--ink:#12262B;--mute:#5B6F73;--line:#DCE5E3;--acc:#0F766E;--acc2:#CCEBE6;--warn:#B45309;--bad:#B91C1C;--ok:#15803D}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+button,input{font:inherit}button{cursor:pointer}:focus-visible{outline:3px solid #F59E0B;outline-offset:2px}
+header{max-width:1240px;margin:0 auto;padding:20px 20px 6px;display:flex;gap:14px;flex-wrap:wrap;align-items:baseline}
+h1{font-size:1.7rem;margin:0;letter-spacing:-.02em}header p{margin:0;color:var(--mute)}
+.clock{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.clock b{background:var(--ink);color:#fff;border-radius:8px;padding:4px 10px}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 12px;font-weight:600}.btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
+main{max-width:1240px;margin:0 auto;padding:10px 20px 40px;display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+@media(max-width:920px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+h2{font-size:.9rem;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.roles{display:flex;gap:6px;margin-bottom:10px}.roles button{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px;font-weight:600}.roles button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+#chat{height:420px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.m{max-width:88%;padding:9px 13px;border-radius:14px}.you{align-self:flex-end;background:var(--acc);color:#fff;border-bottom-right-radius:4px}
+.bot{align-self:flex-start;background:var(--acc2);border-bottom-left-radius:4px}.bot small{display:block;color:var(--mute);margin-top:3px}
+.m.app{max-width:100%;width:100%;background:var(--card);border:1px solid var(--line);padding:8px}.m.app iframe{width:100%;border:0;height:320px;border-radius:10px;background:#fff}.m.app small{margin:0 0 6px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.chips button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:.88rem}.chips button.hot{border-color:var(--acc);color:var(--acc);font-weight:700}
+form{display:flex;gap:8px}form input{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.right{display:flex;flex-direction:column;gap:18px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);gap:10px}
+.tag{font-size:.78rem;font-weight:700;border-radius:999px;padding:2px 10px;border:1px solid}.taken{color:var(--ok);border-color:#86EFAC}.missed{color:var(--bad);border-color:#FCA5A5}.due{color:var(--warn);border-color:#FCD34D}.upcoming{color:var(--mute);border-color:var(--line)}
+.alert{border-left:4px solid var(--warn);background:var(--bg);padding:8px 12px;border-radius:6px;margin:6px 0}.alert.urgent{border-color:var(--bad)}.alert.info{border-color:var(--acc)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.88rem}.kv dt{color:var(--mute)}.kv dd{margin:0;font-family:ui-monospace,monospace;word-break:break-all}
+pre{background:#0F1B1E;color:#CFE9E4;border-radius:10px;padding:10px;font-size:.76rem;max-height:190px;overflow:auto;margin:0;white-space:pre-wrap;word-break:break-word}
+.note{color:var(--mute);font-size:.85rem;margin-top:8px}.live{display:inline-block;width:9px;height:9px;border-radius:50%;background:#16A34A;margin-right:6px;animation:p 1.6s infinite}@keyframes p{50%{opacity:.35}}
+.overlay{position:fixed;inset:0;background:#06121599;display:none;place-items:center;z-index:10;padding:16px}.overlay.on{display:grid}
+.modal{background:#fff;border-radius:16px;padding:22px;max-width:440px;width:100%}.modal h3{margin:0 0 8px}.modal .acts{display:flex;gap:8px;margin-top:16px}.modal .acts button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);font-weight:700}
+.modal .acts .y{background:var(--acc);color:#fff;border-color:var(--acc)}
+@media (prefers-reduced-motion:reduce){.live{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Hearth</h1><p>Alexa+ care companion · MCP 2025-11-25 · MCP Apps · fictional data, simulated devices</p>
+  <div class="clock"><span>Demo time</span><b id="now">--</b><button class="btn" data-adv="60">+1 h</button><button class="btn" data-adv="180">+3 h</button><button class="btn" id="reset">Reset</button></div>
+</header>
+<main>
+  <section class="card" aria-label="Alexa+ simulator">
+    <h2>Alexa+ simulator (acts as the MCP client and MCP Apps host)</h2>
+    <div class="roles" role="tablist"><button class="on" data-role="elder" role="tab">Amina (on the Echo)</button><button data-role="caregiver" role="tab">Salma (caregiver)</button></div>
+    <div id="chat" aria-live="polite"></div>
+    <div class="chips" id="chips"></div>
+    <form id="f"><input id="q" placeholder="Talk to Alexa+..." autocomplete="off" aria-label="Message" /><button class="btn p">Send</button></form>
+    <p class="note">Phrases are mapped to MCP tool calls by simple rules here; real Alexa+ chooses tools itself. The dashboard under Salma is an <b>MCP App</b> rendered in a sandboxed iframe.</p>
+  </section>
+  <div class="right">
+    <section class="card"><h2>Protocol session</h2>
+      <dl class="kv"><dt>session</dt><dd id="sid">-</dd><dt>protocol</dt><dd id="pv">-</dd><dt>server</dt><dd id="srv">-</dd><dt>push stream</dt><dd><span class="live"></span><span id="pushes">0 updates pushed</span></dd><dt>last event id</dt><dd id="lastid">-</dd></dl>
+      <p class="note">Subscribed to <code>hearth://live</code>: the server pushes changes over a resumable SSE stream, no polling.</p></section>
+    <section class="card"><h2>Today's medicines (resource hearth://live)</h2><div id="today"></div></section>
+    <section class="card"><h2>Caregiver inbox (simulated push + SMS)</h2><div id="inbox"></div></section>
+    <section class="card"><h2>Live MCP traffic</h2><pre id="log">Connecting...</pre></section>
+  </div>
+</main>
+<div class="overlay" id="consent" role="dialog" aria-modal="true" aria-labelledby="ctitle"><div class="modal"><h3 id="ctitle">Alexa+ is asking you</h3><p id="cmsg"></p><p class="note">Sent as an MCP elicitation request. Emergencies and requests you make yourself never ask.</p><div class="acts"><button class="y" id="cyes">Yes, tell Salma</button><button id="cno">No, keep it private</button></div></div></div>
+<script>
+const $=(s)=>document.querySelector(s), PV="2025-11-25", sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+let logBuf="";const log=(l)=>{logBuf=l+"\n"+logBuf;$("#log").textContent=logBuf.slice(0,2200)};
+
+/* ---------- MCP client (Streamable HTTP) ---------- */
+class McpClient{
+  constructor(){this.rid=1;this.sid=null;this.lastId=null;this.alive=true;this.onNotify=()=>{};this.onServerRequest=async()=>({})}
+  h(extra={}){return {"Content-Type":"application/json",Accept:"application/json, text/event-stream",...(this.sid?{"MCP-Session-Id":this.sid,"MCP-Protocol-Version":PV}:{}),...extra}}
+  async readSSE(res,onMsg,track){const rd=res.body.getReader(),dec=new TextDecoder();let buf="";
+    for(;;){const {value,done}=await rd.read();if(done)return;buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf("\n\n"))>=0){const raw=buf.slice(0,i);buf=buf.slice(i+2);const id=(raw.match(/^id: (.*)$/m)||[])[1],data=raw.split("\n").filter(l=>l.startsWith("data:")).map(l=>l.slice(5).trim()).join("");
+        if(id&&track){this.lastId=id;$("#lastid").textContent=id}if(data)await onMsg(JSON.parse(data))}}}
+  async dispatch(m){
+    if(m.method&&m.id!==undefined){log(`< server request ${m.method}`);let result;try{result=await this.onServerRequest(m)}catch(e){result={action:"cancel"}}
+      await fetch("/mcp",{method:"POST",headers:this.h(),body:JSON.stringify({jsonrpc:"2.0",id:m.id,result})});log(`> response to ${m.method}: ${JSON.stringify(result)}`)}
+    else if(m.method){log(`< notification ${m.method}`);this.onNotify(m)}}
+  async post(body,collect){const res=await fetch("/mcp",{method:"POST",headers:this.h(),body:JSON.stringify(body)});
+    if(res.status===202)return res;if(!res.ok)throw new Error("HTTP "+res.status);
+    if((res.headers.get("content-type")||"").includes("application/json")){const j=await res.json();await collect(j)}else await this.readSSE(res,collect,false);return res}
+  async rpc(method,params={}){const id=this.rid++;let out;log(`> ${method}${params.name?" "+params.name:""}${params.uri?" "+params.uri:""}`);
+    await this.post({jsonrpc:"2.0",id,method,params},async m=>{if(m.id===id&&(m.result!==undefined||m.error))out=m;else await this.dispatch(m)});
+    if(!out)throw new Error("no response");if(out.error)throw new Error(out.error.message);return out.result}
+
+  async notify(method,params={}){await fetch("/mcp",{method:"POST",headers:this.h(),body:JSON.stringify({jsonrpc:"2.0",method,params})})}
+  async stream(){while(this.alive){try{const res=await fetch("/mcp",{headers:{Accept:"text/event-stream","MCP-Session-Id":this.sid,"MCP-Protocol-Version":PV,...(this.lastId?{"Last-Event-ID":this.lastId}:{})}});
+    if(res.status===200)await this.readSSE(res,m=>this.dispatch(m),true)}catch{}await sleep(1500)}}
+}
+const mcp=new McpClient();
+
+/* The initialize reply is read separately so we can show server info */
+async function connect(){
+  const body={jsonrpc:"2.0",id:mcp.rid++,method:"initialize",params:{protocolVersion:PV,capabilities:{elicitation:{},extensions:{"io.modelcontextprotocol/ui":{mimeTypes:["text/html;profile=mcp-app"]}}},clientInfo:{name:"hearth-alexa-simulator",version:"2.0.0"}}};
+  log("> initialize (protocol "+PV+", elicitation, io.modelcontextprotocol/ui)");
+  const r=await fetch("/mcp",{method:"POST",headers:mcp.h(),body:JSON.stringify(body)});mcp.sid=r.headers.get("mcp-session-id");
+  let init;if((r.headers.get("content-type")||"").includes("json"))init=await r.json();else await mcp.readSSE(r,m=>{if(m.result)init=m},false);
+  $("#sid").textContent=mcp.sid.slice(0,13)+"...";$("#pv").textContent=init.result.protocolVersion;$("#srv").textContent=init.result.serverInfo.name+" "+init.result.serverInfo.version;
+  await mcp.notify("notifications/initialized");
+  mcp.tools=(await mcp.rpc("tools/list")).tools;
+  mcp.onNotify=m=>{if(m.method==="notifications/resources/updated"){pushes++;$("#pushes").textContent=pushes+" updates pushed";refresh()}};
+  mcp.onServerRequest=async m=>{if(m.method==="elicitation/create")return await askConsent(m.params.message);return {}};
+  mcp.stream();await mcp.rpc("resources/subscribe",{uri:"hearth://live"});refresh();
+}
+let pushes=0;
+const askConsent=(msg)=>new Promise(res=>{$("#cmsg").textContent=msg;$("#consent").classList.add("on");$("#cyes").focus();
+  const done=(v)=>{$("#consent").classList.remove("on");res(v?{action:"accept",content:{share:true}}:{action:"decline"})};$("#cyes").onclick=()=>done(true);$("#cno").onclick=()=>done(false)});
+const tool=async(name,args={})=>{const r=await mcp.rpc("tools/call",{name,arguments:args});r.json=(()=>{try{return JSON.parse(r.content[0].text)}catch{return null}})();return r};
+
+/* ---------- Live state (resource) ---------- */
+async function refresh(){
+  const r=await mcp.rpc("resources/read",{uri:"hearth://live"});const s=JSON.parse(r.contents[0].text);$("#now").textContent=s.now;
+  $("#today").innerHTML=s.today.map(d=>`<div class="row"><span>${d.time} · ${d.medication} ${d.dose}</span><span class="tag ${d.status}">${d.status}${d.takenAt?" "+d.takenAt:""}</span></div>`).join("");
+  $("#inbox").innerHTML=s.outbox.length?s.outbox.map(o=>`<div class="alert ${o.severity}"><b>${o.severity.toUpperCase()}</b> · ${o.at} · to ${o.to}<br>${o.reason}</div>`).join(""):`<p class="note">Nothing sent yet. Hearth contacts the caregiver only when it should, and asks you first.</p>`;
+}
+
+/* ---------- MCP Apps host ---------- */
+const uiCache={};
+async function renderApp(tl,toolName,args,result){
+  const uri=tl._meta.ui.resourceUri;if(!uiCache[uri])uiCache[uri]=(await mcp.rpc("resources/read",{uri})).contents[0];
+  const res=uiCache[uri];if(res.mimeType!=="text/html;profile=mcp-app")return false;
+  const wrap=document.createElement("div");wrap.className="m app";wrap.innerHTML=`<small>MCP App · ${uri} · sandboxed iframe (opaque origin)</small>`;
+  const fr=document.createElement("iframe");fr.setAttribute("sandbox","allow-scripts");fr.title="Hearth caregiver dashboard";fr.srcdoc=res.text;wrap.appendChild(fr);$("#chat").appendChild(wrap);$("#chat").scrollTop=1e9;
+  const post=(m)=>fr.contentWindow.postMessage({jsonrpc:"2.0",...m},"*");
+  const onMsg=async(e)=>{if(e.source!==fr.contentWindow)return;const m=e.data;if(!m||m.jsonrpc!=="2.0")return;
+    if(m.method==="ui/initialize")return post({id:m.id,result:{protocolVersion:"2026-01-26",hostCapabilities:{serverTools:{},serverResources:{},logging:{}},hostInfo:{name:"hearth-sim-host",version:"2.0.0"},
+      hostContext:{theme:"light",displayMode:"inline",availableDisplayModes:["inline"],containerDimensions:{maxHeight:720},locale:navigator.language,
+        styles:{variables:{"--color-background-primary":"#ffffff","--color-background-secondary":"#f1f5f4","--color-text-primary":"#12262b","--color-text-secondary":"#52676b","--color-border-primary":"#d7e2e0","--font-sans":"'Segoe UI', system-ui, sans-serif"}}}}});
+    if(m.method==="ui/notifications/initialized"){post({method:"ui/notifications/tool-input",params:{arguments:args}});post({method:"ui/notifications/tool-result",params:result});return}
+    if(m.method==="ui/notifications/size-changed"){if(m.params&&m.params.height)fr.style.height=Math.min(720,Math.ceil(m.params.height)+4)+"px";return}
+    if(m.method==="tools/call"){const t=mcp.tools.find(x=>x.name===m.params.name),vis=(t&&t._meta&&t._meta.ui&&t._meta.ui.visibility)||["model","app"];
+      if(!t||!vis.includes("app"))return post({id:m.id,error:{code:-32601,message:"Tool not callable by apps"}});
+      try{post({id:m.id,result:await mcp.rpc("tools/call",m.params)})}catch(err){post({id:m.id,error:{code:-32000,message:err.message}})}return}
+    if(m.id!==undefined)post({id:m.id,error:{code:-32601,message:"Not supported by this host"}})};
+  window.addEventListener("message",onMsg);return true;
+}
+
+/* ---------- Chat + simulated Alexa+ policy ---------- */
+let role="elder";
+const say=(t,who,note)=>{const d=document.createElement("div");d.className="m "+who;d.textContent=t;if(note){const s=document.createElement("small");s.textContent=note;d.appendChild(s)}$("#chat").appendChild(d);$("#chat").scrollTop=1e9};
+const moodMap={great:5,good:4,fine:4,okay:3,ok:3,tired:2,sad:2,lonely:2,bad:1,awful:1};
+async function proactive(){
+  say("(Alexa+ routine) Running the daily wellbeing check...","bot");
+  const r=await tool("get_wellbeing_summary",{days:7});const sm=r.structuredContent.summary;
+  if(!sm.flags.length)return say("All good. Nothing to report, so I did not contact anyone.","bot","get_wellbeing_summary");
+  const n=await tool("notify_caregiver",{reason:sm.flags.map(f=>f.text).join(" "),severity:"attention",requested_by_person:false});
+  say(n.json.ok?"Done. I let Salma know.":"Understood. I will keep that between us.","bot","notify_caregiver (consent via MCP elicitation)");
+}
+async function handle(text){
+  const t=text.toLowerCase().trim();say(text,"you");let m;
+  try{
+  if(role==="elder"){
+    if(/(fell|fallen|can't get up|chest pain|emergency)/.test(t)){await tool("notify_caregiver",{reason:`Amina said: "${text.slice(0,120)}"`,severity:"urgent"});return say("If this is an emergency, please call your local emergency number now. I have also told Salma right away.","bot","notify_caregiver (urgent, no consent step)")}
+    if(/(call|tell|message).*(salma|daughter)|i need help/.test(t)){await tool("notify_caregiver",{reason:`Amina asked for a call: "${text.slice(0,120)}"`,severity:"attention",requested_by_person:true});return say("Done. I let Salma know you would like to talk.","bot","notify_caregiver (you asked, so no extra consent)")}
+    if(/took (my )?(pills|medicine)/.test(t)){const due=(await tool("list_today")).json.doses.filter(d=>d.status==="due"||d.status==="missed");let n=0;for(const d of due){const x=await tool("log_dose",{medication:d.medication});if(x.json.ok)n++}return say(n?`Logged ${n} dose${n>1?"s":""}. Well done.`:"I do not see any dose waiting right now.","bot","log_dose")}
+    if((m=t.match(/(?:took|taken|had)\s+(?:my\s+)?([a-z]+)/))){const x=await tool("log_dose",{medication:m[1]});return say(x.json.ok?`Thanks, I logged your ${x.json.dose.medication}${x.json.late?" (a little late, no worries)":""}.`:x.json.message,"bot","log_dose")}
+    if(/(schedule|what.*(take|due)|medicine|pills)/.test(t)){const x=await tool("list_today");const p=x.json.doses.filter(d=>d.status!=="taken");return say(p.length?"Still to take: "+p.map(d=>`${d.medication} at ${d.time}`).join(", ")+".":"You have taken everything for today.","bot","list_today")}
+    if((m=t.match(/feel(?:ing)?\s+(\w+)/))&&moodMap[m[1]]){const mood=moodMap[m[1]];await tool("record_checkin",{mood,note:text.slice(0,100)});return say(mood<=2?"I am sorry to hear that. I noted it. Would you like me to ask Salma to call you?":"Glad to hear it. I noted how you feel today.","bot","record_checkin")}
+    if(/(good morning|i'?m up|morning)/.test(t)){await tool("record_home_signal",{kind:"morning_activity"});return say("Good morning, Amina! Ask me what is left to take today.","bot","record_home_signal")}
+    return say("I can log your medicines, tell you your schedule, note how you feel, or contact Salma.","bot");
+  }
+  if(/(how|doing|summary|status|week|dashboard)/.test(t)){const tl=mcp.tools.find(x=>x.name==="get_wellbeing_summary");const r=await tool("get_wellbeing_summary",{days:7});
+    say(r.content[0].text,"bot","get_wellbeing_summary");if(tl._meta&&tl._meta.ui)await renderApp(tl,"get_wellbeing_summary",{days:7},r);return}
+  if((m=t.match(/add\s+(\w+)\s+([\d.]+\s?\w+)\s+at\s+([\d: ]+)/))){const times=m[3].trim().split(/\s+/).map(x=>x.includes(":")?x:x.padStart(2,"0")+":00");const r=await tool("add_medication",{name:m[1][0].toUpperCase()+m[1].slice(1),dose:m[2],times});return say(r.json.ok?`Added ${m[1]} at ${times.join(", ")}.`:r.json.error||"I could not add that.","bot","add_medication")}
+  say('Ask me: "How is mum doing?" or "Add Aspirin 75mg at 09:00".',"bot");
+  }catch(e){say("Something went wrong: "+e.message,"bot")}
+}
+const CHIPS={elder:["Good morning","What do I take today?","I took my metformin","I feel tired","I feel great","Tell Salma I need help","I fell","★ Run proactive check"],caregiver:["How is mum doing?","Add Vitamin 1000IU at 09:00"]};
+function chips(){$("#chips").innerHTML="";CHIPS[role].forEach(c=>{const b=document.createElement("button");b.type="button";b.textContent=c;if(c[0]==="★")b.className="hot";b.onclick=()=>c[0]==="★"?proactive():handle(c);$("#chips").appendChild(b)})}
+document.querySelectorAll("[data-role]").forEach(b=>b.onclick=()=>{role=b.dataset.role;document.querySelectorAll("[data-role]").forEach(x=>x.classList.toggle("on",x===b));chips();say(role==="elder"?"Switched to Amina's Echo.":"Switched to Salma's Alexa app. Ask how mum is doing.","bot")});
+$("#f").onsubmit=(e)=>{e.preventDefault();const v=$("#q").value.trim();if(v){$("#q").value="";handle(v)}};
+document.querySelectorAll("[data-adv]").forEach(b=>b.onclick=()=>fetch("/api/demo/advance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({minutes:+b.dataset.adv})}));
+$("#reset").onclick=async()=>{await fetch("/api/demo/reset",{method:"POST"});$("#chat").innerHTML="";say("Demo reset.","bot")};
+chips();say("Hi, I am Alexa+ with the Hearth skill. Try: Good morning, I feel tired, then +3 h and ★ Run proactive check. Then switch to Salma.","bot");
+connect().catch(e=>{$("#log").textContent="Connection failed: "+e.message});
+</script>
+</body></html>
